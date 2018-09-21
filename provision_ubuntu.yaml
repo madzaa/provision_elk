@@ -1,0 +1,87 @@
+- name: Create Azure VM
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: Create resource group
+    azure_rm_resourcegroup:
+      name: ELKboiResourceGroup
+      location: westeurope
+  - name: Create virtual network
+    azure_rm_virtualnetwork:
+      resource_group: ELKboiResourceGroup
+      name: ELKboiVnet
+      address_prefixes: "10.0.0.0/16"
+  - name: Add subnet
+    azure_rm_subnet:
+      resource_group: ELKboiResourceGroup
+      name: ELKboiSubnet
+      address_prefix: "10.0.1.0/24"
+      virtual_network: ELKboiVnet
+  - name: Create public IP address
+    azure_rm_publicipaddress:
+      resource_group: ELKboiResourceGroup
+      allocation_method: Static
+      name: ELKboiPublicIP
+    register: output_ip_address
+  - name: Dump public IP for VM which will be created
+    debug:
+      msg: "The public IP is {{ output_ip_address.state.ip_address }}."
+  - name: Create Network Security Group that allows SSH
+    azure_rm_securitygroup:
+      resource_group: ELKboiResourceGroup
+      name: ELKboiNetworkSecurityGroup
+      rules:
+        - name: SSH
+          protocol: Tcp
+          destination_port_range: 22
+          access: Allow
+          priority: 1001
+          direction: Inbound
+        - name: HTTP
+          protocol: Tcp
+          destination_port_range: 80
+          access: Allow
+          priority: 1002
+          direction: Inbound
+        - name: kibana_in
+          protocol: Tcp
+          destination_port_range: 5601
+          access: Allow
+          priority: 111
+          direction: Inbound
+        - name: elasticsearch_out
+          protocol: Tcp
+          destination_port_range: 9200-9300
+          access: Allow
+          priority: 112
+          direction: Outbound
+        - name: kibana_out
+          protocol: Tcp
+          destination_port_range: 5601
+          access: Allow
+          priority: 113
+          direction: Outbound  
+  - name: Create virtual network inteface card
+    azure_rm_networkinterface:
+      resource_group: ELKboiResourceGroup
+      name: ELKboiNIC
+      virtual_network: ELKboiVnet
+      subnet: ELKboiSubnet
+      public_ip_name: ELKboiPublicIP
+      security_group: ELKboiNetworkSecurityGroup
+  - name: Create VM
+    azure_rm_virtualmachine:
+      resource_group: ELKboiResourceGroup
+      name: ELKboiVM
+      vm_size: Standard_DS2_v2
+      admin_username: azureuser
+      ssh_password_enabled: false
+      ssh_public_keys:
+        - path: /home/azureuser/.ssh/authorized_keys
+          key_data: <ssh key here>
+      network_interfaces: ELKboiNIC
+      image:
+        offer: UbuntuServer
+        publisher: Canonical
+        sku: '16.04-LTS'
+        version: latest
