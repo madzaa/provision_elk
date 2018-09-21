@@ -3,7 +3,7 @@
 ## Instructions
 
 * Open the Azure Cloud CLI
-* Clone this repo by
+* Clone this repo 
 
 ```
 git clone https://github.com/madzaa/provision_elk.git
